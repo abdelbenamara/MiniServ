@@ -6,7 +6,7 @@
 #    By: abenamar <abenamar@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/04/28 09:32:29 by abenamar          #+#    #+#              #
-#    Updated: 2025/04/30 01:41:05 by abenamar         ###   ########.fr        #
+#    Updated: 2025/04/30 20:42:11 by abenamar         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -23,6 +23,12 @@ CFLAGS += -Wextra
 CFLAGS += -Werror
 CFLAGS += -g3
 
+MEM := valgrind
+
+MEMFLAGS := --show-leak-kinds=all
+MEMFLAGS += --leak-check=full
+MEMFLAGS += --track-fds=yes
+
 RM := rm -f
 
 %.o: %.c
@@ -32,6 +38,9 @@ $(NAME): $(OBJS)
 	$(CC) $(CFLAGS) -o $(NAME) $(OBJS)
 
 all: $(NAME)
+
+8081: all
+	$(MEM) $(MEMFLAGS) ./$(NAME) 8081
 
 clean:
 	$(RM) $(OBJS)

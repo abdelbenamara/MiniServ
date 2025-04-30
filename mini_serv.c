@@ -6,7 +6,7 @@
 /*   By: abenamar <abenamar@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/28 09:37:07 by abenamar          #+#    #+#             */
-/*   Updated: 2025/04/30 14:29:11 by abenamar         ###   ########.fr       */
+/*   Updated: 2025/04/30 20:59:35 by abenamar         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -36,39 +36,6 @@ typedef struct s_server
   fd_set fds, rfds, wfds;
 } t_server;
 
-static void ft_fatal(char const *const str)
-{
-  if (str)
-    write(STDERR_FILENO, str, strlen(str));
-  else
-    write(STDERR_FILENO, "Fatal error\n", 12);
-  return (exit(EXIT_FAILURE));
-}
-
-static void ft_init_server(t_server *srv, in_port_t const port)
-{
-  struct sockaddr_in addr;
-
-  srv->sockfd = socket(AF_INET, SOCK_STREAM, 0);
-  if (-1 == srv->sockfd)
-    return (ft_fatal(NULL));
-  srv->maxfd = srv->sockfd + 1;
-  addr.sin_family = AF_INET;
-  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-  addr.sin_port = htons(port);
-  if (bind(srv->sockfd, (struct sockaddr const *)&addr, sizeof(addr)) ||
-      listen(srv->sockfd, SOMAXCONN) ||
-      0 > sprintf(srv->rbuf,
-                  "server: accepting connections on port %d\n", port) ||
-      -1 == write(STDOUT_FILENO, srv->rbuf, strlen(srv->rbuf)))
-    return (close(srv->sockfd), ft_fatal(NULL));
-  srv->clients = NULL;
-  FD_ZERO(&srv->fds);
-  srv->rfds = srv->fds;
-  srv->wfds = srv->fds;
-  return;
-}
-
 static void ft_free_server(t_server *srv)
 {
   t_client *prev, *curr;
@@ -88,7 +55,38 @@ static void ft_free_server(t_server *srv)
     free(prev);
   }
   if (err)
+    return (write(STDERR_FILENO, "Fatal error\n", 12), exit(EXIT_FAILURE));
+  return;
+}
+
+static void ft_fatal(t_server *srv)
+{
+  if (srv)
+    ft_free_server(srv);
+  return (write(STDERR_FILENO, "Fatal error\n", 12), exit(EXIT_FAILURE));
+}
+
+static void ft_init_server(t_server *srv, in_port_t const port)
+{
+  struct sockaddr_in addr;
+
+  srv->sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  if (-1 == srv->sockfd)
     return (ft_fatal(NULL));
+  srv->maxfd = srv->sockfd + 1;
+  srv->clients = NULL;
+  addr.sin_family = AF_INET;
+  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  addr.sin_port = htons(port);
+  if (bind(srv->sockfd, (struct sockaddr const *)&addr, sizeof(addr)) ||
+      listen(srv->sockfd, SOMAXCONN) ||
+      0 > sprintf(srv->rbuf,
+                  "server: accepting connections on port %d\n", port) ||
+      -1 == write(STDOUT_FILENO, srv->rbuf, strlen(srv->rbuf)))
+    return (ft_fatal(srv));
+  FD_ZERO(&srv->fds);
+  srv->rfds = srv->fds;
+  srv->wfds = srv->fds;
   return;
 }
 
@@ -130,7 +128,7 @@ static char *str_join(char *buf, char *add)
     len = strlen(buf);
   newbuf = malloc(sizeof(char) * (len + strlen(add) + 1));
   if (!newbuf)
-    return (0);
+    return (NULL);
   newbuf[0] = 0;
   if (buf)
     strcat(newbuf, buf);
@@ -147,23 +145,19 @@ static void ft_broadcast(t_server *srv, int const fd, char const *format)
   size_t msglen;
 
   prev = srv->clients;
-  while (prev)
-  {
-    if (prev->connfd == fd)
-      break;
+  while (prev && prev->connfd != fd)
     prev = prev->next;
-  }
   prev->buf = str_join(prev->buf, srv->rbuf);
   if (!prev->buf)
-    return (ft_free_server(srv), ft_fatal(NULL));
+    return (ft_fatal(srv));
   buflen = sprintf(srv->rbuf, format, prev->id);
   if (0 > buflen)
-    return (ft_free_server(srv), ft_fatal(NULL));
+    return (ft_fatal(srv));
   while (*prev->buf)
   {
     ready = extract_message(&prev->buf, &msg);
     if (-1 == ready)
-      return (ft_free_server(srv), ft_fatal(NULL));
+      return (ft_fatal(srv));
     else if (!ready)
       break;
     msglen = strlen(msg);
@@ -174,7 +168,7 @@ static void ft_broadcast(t_server *srv, int const fd, char const *format)
       {
         if (-1 == write(curr->connfd, srv->rbuf, buflen) ||
             -1 == write(curr->connfd, msg, msglen))
-          return (free(msg), ft_free_server(srv), ft_fatal(NULL));
+          return (free(msg), ft_fatal(srv));
       }
       curr = curr->next;
     }
@@ -190,33 +184,34 @@ static void ft_add_client(t_server *srv, int const fd)
 
   new = malloc(sizeof(t_client));
   if (!new)
-    return (ft_free_server(srv), ft_fatal(NULL));
+    return (ft_fatal(srv));
   if (-1 == fd)
-    new->connfd = accept(srv->sockfd, NULL, NULL);
-  else
-    new->connfd = fd;
-  if (-1 == new->connfd)
-    return (free(new), ft_free_server(srv), ft_fatal(NULL));
-  if (srv->maxfd >= FD_SETSIZE)
   {
-    if (close(new->connfd))
-      return (free(new), ft_free_server(srv), ft_fatal(NULL));
-    return (free(new));
+    new->connfd = accept(srv->sockfd, NULL, NULL);
+    if (-1 == new->connfd)
+      return (free(new), ft_fatal(srv));
+    if (srv->maxfd >= FD_SETSIZE)
+    {
+      if (close(new->connfd))
+        return (free(new), ft_fatal(srv));
+      return (free(new));
+    }
+    new->id = id++;
+  }
+  else
+  {
+    new->connfd = fd;
+    new->id = -1;
   }
   if (srv->maxfd <= new->connfd)
     srv->maxfd = new->connfd + 1;
-  if (-1 == fd)
-    new->id = id++;
-  else
-    new->id = -1;
   new->buf = NULL;
   new->next = srv->clients;
   srv->clients = new;
   FD_SET(new->connfd, &srv->fds);
   if (0 > sprintf(srv->rbuf, "client %d just arrived\n", new->id))
-    return (ft_free_server(srv), ft_fatal(NULL));
-  ft_broadcast(srv, new->connfd, "server: ");
-  return;
+    return (ft_fatal(srv));
+  return (ft_broadcast(srv, new->connfd, "server: "));
 }
 
 static void ft_del_client(t_server *srv, int const fd)
@@ -231,7 +226,7 @@ static void ft_del_client(t_server *srv, int const fd)
     if (curr->connfd == fd)
     {
       if (0 > sprintf(srv->rbuf, "client %d just left\n", curr->id))
-        return (ft_free_server(srv), ft_fatal(NULL));
+        return (ft_fatal(srv));
       ft_broadcast(srv, fd, "server: ");
       if (!prev)
       {
@@ -242,7 +237,7 @@ static void ft_del_client(t_server *srv, int const fd)
         prev->next = curr->next;
       FD_CLR(curr->connfd, &srv->fds);
       if (close(curr->connfd))
-        return (ft_free_server(srv), ft_fatal(NULL));
+        return (ft_fatal(srv));
       free(curr->buf);
       free(curr);
       curr = prev;
@@ -261,7 +256,8 @@ int main(int argc, char **argv)
   int nfds, fd, nbytes;
 
   if (argc < 2)
-    ft_fatal("Wrong number of arguments\n");
+    return (write(STDERR_FILENO, "Wrong number of arguments\n", 26),
+            EXIT_FAILURE);
   ft_init_server(&srv, atoi(argv[1]));
   ft_add_client(&srv, STDIN_FILENO);
   ft_add_client(&srv, STDOUT_FILENO);
@@ -274,7 +270,7 @@ int main(int argc, char **argv)
     FD_CLR(STDIN_FILENO, &srv.wfds);
     nfds = select(srv.maxfd, &srv.rfds, &srv.wfds, NULL, NULL);
     if (-1 == nfds)
-      return (ft_free_server(&srv), ft_fatal(NULL), EXIT_FAILURE);
+      return (ft_fatal(&srv), EXIT_FAILURE);
     if (FD_ISSET(STDIN_FILENO, &srv.rfds))
       break;
     fd = STDOUT_FILENO;
@@ -291,7 +287,7 @@ int main(int argc, char **argv)
           {
             nbytes = recv(fd, srv.rbuf, BUFSIZ, 0);
             if (-1 == nbytes)
-              return (ft_free_server(&srv), ft_fatal(NULL), EXIT_FAILURE);
+              return (ft_fatal(&srv), EXIT_FAILURE);
             srv.rbuf[nbytes] = '\0';
             if (!nbytes)
               ft_del_client(&srv, fd);
@@ -305,7 +301,7 @@ int main(int argc, char **argv)
     }
   }
   if (0 > sprintf(srv.rbuf, "shutting down...\n"))
-    return (ft_free_server(&srv), ft_fatal(NULL), EXIT_FAILURE);
+    return (ft_fatal(&srv), EXIT_FAILURE);
   return (ft_broadcast(&srv, STDIN_FILENO, "server: "),
           ft_free_server(&srv), EXIT_SUCCESS);
 }
