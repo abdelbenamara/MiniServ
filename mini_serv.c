@@ -6,7 +6,7 @@
 /*   By: abenamar <abenamar@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/28 09:37:07 by abenamar          #+#    #+#             */
-/*   Updated: 2025/04/30 14:20:10 by abenamar         ###   ########.fr       */
+/*   Updated: 2025/04/30 14:29:11 by abenamar         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,7 +28,7 @@ typedef struct s_client
   struct s_client *next;
 } t_client;
 
-typedef struct s_srver
+typedef struct s_server
 {
   int sockfd, maxfd;
   t_client *clients;
