@@ -6,7 +6,7 @@
 /*   By: abenamar <abenamar@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/28 09:37:07 by abenamar          #+#    #+#             */
-/*   Updated: 2025/05/05 23:15:16 by abenamar         ###   ########.fr       */
+/*   Updated: 2025/05/06 01:05:52 by abenamar         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -47,12 +47,10 @@ static void ft_error(char const *const msg)
 
 static void ft_server_stop(t_server *srv)
 {
-  t_client *prev, *curr;
   int err;
+  t_client *prev, *curr;
 
   err = 0;
-  if (close(srv->sockfd))
-    err = -1;
   curr = srv->clients;
   while (curr)
   {
@@ -63,6 +61,8 @@ static void ft_server_stop(t_server *srv)
     curr = curr->next;
     free(prev);
   }
+  if (close(srv->sockfd))
+    err = -1;
   if (err)
     return (ft_error(NULL));
   return;
@@ -75,8 +75,8 @@ static void ft_fatal(t_server *srv)
 
 static int extract_message(char **buf, char **msg)
 {
-  char *newbuf;
   int i;
+  char *newbuf;
 
   *msg = NULL;
   if (!*buf)
@@ -102,8 +102,8 @@ static int extract_message(char **buf, char **msg)
 
 static char *str_join(char *buf, char *add)
 {
-  char *newbuf;
   int len;
+  char *newbuf;
 
   if (!buf)
     len = 0;
@@ -124,11 +124,11 @@ static void ft_broadcast(t_server *srv, int const fd, char const *format)
 {
   t_client *prev, *curr;
   char *msg;
-  int ready, buflen;
+  int buflen, ready;
   size_t msglen;
 
   prev = srv->clients;
-  while (prev && prev->connfd != fd)
+  while (prev && fd != prev->connfd)
     prev = prev->next;
   prev->buf = str_join(prev->buf, srv->rbuf);
   if (!prev->buf)
@@ -285,7 +285,7 @@ int main(int argc, char **argv)
       else
       {
         nbytes = BUFSIZ;
-        while (nbytes == BUFSIZ)
+        while (BUFSIZ == nbytes)
         {
           nbytes = recv(fd, srv.rbuf, BUFSIZ, 0);
           if (-1 == nbytes)
