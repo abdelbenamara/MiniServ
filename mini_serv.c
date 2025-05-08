@@ -6,7 +6,7 @@
 /*   By: abenamar <abenamar@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/28 09:37:07 by abenamar          #+#    #+#             */
-/*   Updated: 2025/05/07 11:45:11 by abenamar         ###   ########.fr       */
+/*   Updated: 2025/05/08 11:32:52 by abenamar         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -212,7 +212,9 @@ static void ft_server_start(t_server *srv, in_port_t const port)
   if (bind(srv->sockfd, (struct sockaddr const *)&addr, sizeof(addr)) ||
       listen(srv->sockfd, SOMAXCONN))
     return (ft_fatal(srv));
+#ifndef NDEBUG
   FD_SET(STDOUT_FILENO, &srv->wfds);
+#endif
   ft_notify(srv, STDIN_FILENO, sprintf(srv->rbuf, "listen on port %d\n", port));
   return;
 }
@@ -251,14 +253,20 @@ int main(int argc, char **argv)
   {
     srv.rfds = srv.fds;
     FD_SET(srv.sockfd, &srv.rfds);
+#ifndef NDEBUG
     FD_SET(STDIN_FILENO, &srv.rfds);
+#endif
     srv.wfds = srv.fds;
+#ifndef NDEBUG
     FD_SET(STDOUT_FILENO, &srv.wfds);
+#endif
     nfds = select(srv.maxfd, &srv.rfds, &srv.wfds, NULL, NULL);
     if (-1 == nfds)
       return (ft_fatal(&srv), EXIT_FAILURE);
+#ifndef NDEBUG
     else if (FD_ISSET(STDIN_FILENO, &srv.rfds))
       break;
+#endif
     fd = STDIN_FILENO;
     while (nfds && ++fd < srv.maxfd)
     {

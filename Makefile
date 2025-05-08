@@ -6,7 +6,7 @@
 #    By: abenamar <abenamar@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/04/28 09:32:29 by abenamar          #+#    #+#              #
-#    Updated: 2025/05/06 01:07:06 by abenamar         ###   ########.fr        #
+#    Updated: 2025/05/08 11:33:49 by abenamar         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -22,6 +22,7 @@ CFLAGS := -Wall
 CFLAGS += -Wextra
 CFLAGS += -Werror
 CFLAGS += -g3
+CFLAGS += -DNDEBUG
 
 MEM := valgrind
 
@@ -50,4 +51,7 @@ fclean: clean
 
 re: fclean all
 
-.PHONY: re fclean clean 8081 all
+debug: CFLAGS += -UNDEBUG
+debug: re
+
+.PHONY: debug re fclean clean 8081 all
